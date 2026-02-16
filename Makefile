@@ -5,33 +5,15 @@ include $(CWPROOT)/src/Makefile.config
 
 D = $L/libcwp.a $L/libpar.a $L/libsu.a
 
+B = .
+
+OPTC = -g
 
 LFLAGS= $(PRELFLAGS) -L$L -lsu -lpar -lcwp -lm $(POSTLFLAGS)
 
 
 PROGS =			\
-	$B/sugazmig	\
-	$B/suinvvxzco	\
-	$B/suinvzco3d	\
-	$B/sukdmig2d	\
-	$B/sukdmig3d	\
-	$B/suktmig2d	\
-	$B/sumigfd	\
-	$B/sumigffd	\
-	$B/sumiggbzoan	\
-	$B/sumiggbzo	\
-	$B/sumigprefd	\
-	$B/sumigpreffd	\
-	$B/sumigprepspi	\
-	$B/sumigpresp	\
-	$B/sumigps	\
-	$B/sumigpspi	\
-	$B/sumigpsti	\
-	$B/sumigsplit	\
-	$B/sumigtk	\
-	$B/sumigtopo2d	\
-	$B/sustolt	\
-	$B/sutifowler
+	$B/gsumigtopo2d	\
 
 
 INSTALL	:	$(PROGS)
