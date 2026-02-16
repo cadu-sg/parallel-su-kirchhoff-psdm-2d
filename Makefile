@@ -14,7 +14,7 @@ LFLAGS= $(PRELFLAGS) -L$L -lsu -lpar -lcwp -lm $(POSTLFLAGS)
 
 
 PROGS =			\
-	$B/gsumigtopo2d	\
+	$B/sumigtopo2d_parallel	\
 
 
 INSTALL	:	$(PROGS)

@@ -56,5 +56,5 @@ Mkfile.old
 dkms.conf
 
 # End of https://www.toptal.com/developers/gitignore/api/c
-gsumigtopo2d
+sumigtopo2d_parallel
 INSTALL
