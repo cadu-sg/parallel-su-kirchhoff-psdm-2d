@@ -2,6 +2,7 @@
 
 include $(CWPROOT)/src/Makefile.config
 
+MPICC = mpicc
 
 D = $L/libcwp.a $L/libpar.a $L/libsu.a
 
@@ -22,7 +23,7 @@ INSTALL	:	$(PROGS)
 
 
 $(PROGS):	$(CTARGET) $D 
-	-$(CC) $(CFLAGS) $(@F).c $(LFLAGS) -o $@
+	-$(MPICC) $(CFLAGS) $(@F).c $(LFLAGS) -o $@
 	@$(MCHMODLINE)
 	@echo $(@F) installed in $B
 
