@@ -4,9 +4,12 @@
 /* SUMIGTOPO2D: $Revision: 1.7 $ ; $Date: 2011/11/16 22:14:43 $	*/
 
 #include <mpi.h>
+#include <stdio.h>
 
-#include "segy.h"
+#include "cwp.h"
 #include "su.h"
+// su.h needs to be included before segy.h
+#include "segy.h"
 
 /*********************** self documentation **********************/
 char* sdoc[] = {
@@ -172,6 +175,29 @@ void zcoorSurfaces(float fx, float dx, int nx, float fxs, float dxs, int nxs,
 segy tr, tro;
 
 int main(int argc, char** argv) {
+  // Initialize the MPI environment
+  MPI_Init(NULL, NULL);
+
+  // Get the number of processes
+  int world_size;
+  MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+
+  // rank of a process in a communicator
+  int world_rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+
+  // Get the name of the processor
+  char processor_name[MPI_MAX_PROCESSOR_NAME];
+  int processor_name_lenght;
+  MPI_Get_processor_name(processor_name, &processor_name_lenght);
+
+  // Print hello world message for MPI
+  fprintf(stderr, "rank: %d, number of processors: %d\n", world_rank,
+          world_size);
+
+  // Finalize the MPI environment
+  MPI_Finalize();
+
   int nt, nzt, nxt, nzo, nxo, ns, noff, nr, is, io, ixo, izo;
   int ls, ntr, jtr, ktr, mtr, mtmax, nsrf, *nxzsrf, nxi;
   off_t nseek;
