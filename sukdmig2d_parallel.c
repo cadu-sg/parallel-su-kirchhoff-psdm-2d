@@ -3,6 +3,9 @@
 
 /* SUKDMIG2D: $Revision: 1.26 $ ; $Date: 2011/11/16 22:14:43 $	*/
 
+#include <mpi.h>
+#include <stdio.h>
+
 #include "su.h"
 // su.h needs to be included before segy.h
 #include "segy.h"
@@ -177,6 +180,12 @@ void mig2d(float* trace, int nt, float ft, float dt, float sx, float gx,
 segy tr, tro;
 
 int main(int argc, char** argv) {
+  MPI_Init(NULL, NULL);
+  int world_size;
+  MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  fprintf(stderr, "rank %d, processors %d\n", rank, world_size);
   int nt;   /* number of time samples in input data		*/
   int nzt;  /* number of z-values in traveltime table	*/
   int nxt;  /* number of x-values in traveltime table	*/
@@ -389,123 +398,144 @@ int main(int argc, char** argv) {
 
   fprintf(jpfp, " fs=%g es=%g offmax=%g\n", fs, es, offmax);
 
+  double start_time = MPI_Wtime();
   do {
-    /* determine offset index	*/
-    float as, res;
+    if ((jtr - 1) % world_size == rank) {
+      // fprintf(stderr, "rank %d, migrate %d\n", rank, jtr);
+      /* determine offset index	*/
+      float as, res;
 
-    if (tr.scalco) { /* if tr.scalco is set, apply value */
-      if (tr.scalco > 0) {
-        sx = tr.sx * tr.scalco;
-        gx = tr.gx * tr.scalco;
-      } else { /* if tr.scalco is negative divide */
-        sx = tr.sx / ABS(tr.scalco);
-        gx = tr.gx / ABS(tr.scalco);
+      if (tr.scalco) { /* if tr.scalco is set, apply value */
+        if (tr.scalco > 0) {
+          sx = tr.sx * tr.scalco;
+          gx = tr.gx * tr.scalco;
+        } else { /* if tr.scalco is negative divide */
+          sx = tr.sx / ABS(tr.scalco);
+          gx = tr.gx / ABS(tr.scalco);
+        }
+
+      } else {
+        sx = tr.sx;
+        gx = tr.gx;
       }
 
-    } else {
-      sx = tr.sx;
-      gx = tr.gx;
-    }
+      /* GWB 2005.09.22: */
+      /* io = (int)((gx-sx-off0)/doff+0.5); */
+      offset = gx - sx;
+      if (absoff && offset < 0) offset = -offset;
+      io = (int)((offset - off0) / doff + 0.5);
+      if (limoff && (io < 0 || io >= noff)) continue;
+      /* end of GWB 2005.09.22 */
 
-    /* GWB 2005.09.22: */
-    /* io = (int)((gx-sx-off0)/doff+0.5); */
-    offset = gx - sx;
-    if (absoff && offset < 0) offset = -offset;
-    io = (int)((offset - off0) / doff + 0.5);
-    if (limoff && (io < 0 || io >= noff)) continue;
-    /* end of GWB 2005.09.22 */
+      if (io < 0) io = 0;
+      if (io >= noff) io = noff - 1;
 
-    if (io < 0) io = 0;
-    if (io >= noff) io = noff - 1;
+      /* fprintf(jpfp," read trace jtr=%d: sx=%g gx=%g io=%d
+       * ktr=%d\n",jtr,sx,gx,io,ktr); */
 
-    /* fprintf(jpfp," read trace jtr=%d: sx=%g gx=%g io=%d
-     * ktr=%d\n",jtr,sx,gx,io,ktr); */
+      if (MIN(sx, gx) >= fs && MAX(sx, gx) <= es &&
+          MAX(gx - sx, sx - gx) <= offmax) {
+        /*     migrate this trace	*/
 
-    if (MIN(sx, gx) >= fs && MAX(sx, gx) <= es &&
-        MAX(gx - sx, sx - gx) <= offmax) {
-      /*     migrate this trace	*/
+        /* fprintf(jpfp," Good! Condition NOT satisfied\n"); */
 
-      /* fprintf(jpfp," Good! Condition NOT satisfied\n"); */
+        as = (sx - fs) / ds;
+        is = (int)as;
+        if (is == ns - 1) is = ns - 2;
+        res = as - is;
+        if (res <= 0.01) res = 0.0;
+        if (res >= 0.99) res = 1.0;
+        sum2(nxt, nzt, 1 - res, res, ttab[is], ttab[is + 1], tsum);
+        if (npv) {
+          sum2(nxt, nzt, 1 - res, res, tv[is], tv[is + 1], tvsum);
+          sum2(nxt, nzt, 1 - res, res, cs[is], cs[is + 1], cssum);
+        }
 
-      as = (sx - fs) / ds;
-      is = (int)as;
-      if (is == ns - 1) is = ns - 2;
-      res = as - is;
-      if (res <= 0.01) res = 0.0;
-      if (res >= 0.99) res = 1.0;
-      sum2(nxt, nzt, 1 - res, res, ttab[is], ttab[is + 1], tsum);
-      if (npv) {
-        sum2(nxt, nzt, 1 - res, res, tv[is], tv[is + 1], tvsum);
-        sum2(nxt, nzt, 1 - res, res, cs[is], cs[is + 1], cssum);
-      }
+        as = (gx - fs) / ds;
+        is = (int)as;
+        if (is == ns - 1) is = ns - 2;
+        res = as - is;
+        if (res <= 0.01) res = 0.0;
+        if (res >= 0.99) res = 1.0;
+        sum2(nxt, nzt, 1 - res, res, ttab[is], ttab[is + 1], tt);
+        sum2(nxt, nzt, 1, 1, tt, tsum, tsum);
+        if (npv) {
+          sum2(nxt, nzt, 1 - res, res, tv[is], tv[is + 1], tt);
+          sum2(nxt, nzt, 1, 1, tt, tvsum, tvsum);
+          sum2(nxt, nzt, 1 - res, res, cs[is], cs[is + 1], tt);
+          sum2(nxt, nzt, 1, 1, tt, cssum, cssum);
+        }
 
-      as = (gx - fs) / ds;
-      is = (int)as;
-      if (is == ns - 1) is = ns - 2;
-      res = as - is;
-      if (res <= 0.01) res = 0.0;
-      if (res >= 0.99) res = 1.0;
-      sum2(nxt, nzt, 1 - res, res, ttab[is], ttab[is + 1], tt);
-      sum2(nxt, nzt, 1, 1, tt, tsum, tsum);
-      if (npv) {
-        sum2(nxt, nzt, 1 - res, res, tv[is], tv[is + 1], tt);
-        sum2(nxt, nzt, 1, 1, tt, tvsum, tvsum);
-        sum2(nxt, nzt, 1 - res, res, cs[is], cs[is + 1], tt);
-        sum2(nxt, nzt, 1, 1, tt, cssum, cssum);
-      }
+        mig2d(tr.data, nt, ft, dt, sx, gx, mig[io], aperx, nxo, fxo, dxo, nzo,
+              fzo, dzo, ls, mtmax, dxm, fmax, angmax, tb, pb, cs0b, angb, nr,
+              tsum, nzt, fzt, dzt, nxt, fxt, dxt, npv, cssum, tvsum, mig1[io]);
 
-      mig2d(tr.data, nt, ft, dt, sx, gx, mig[io], aperx, nxo, fxo, dxo, nzo,
-            fzo, dzo, ls, mtmax, dxm, fmax, angmax, tb, pb, cs0b, angb, nr,
-            tsum, nzt, fzt, dzt, nxt, fxt, dxt, npv, cssum, tvsum, mig1[io]);
-
-      ktr++;
-      if ((jtr - 1) % mtr == 0) {
-        fprintf(jpfp, " migrated trace %d\n", jtr);
-        fflush(jpfp);
+        ktr++;
+        if ((jtr - 1) % mtr == 0) {
+          fprintf(jpfp, " migrated trace %d\n", jtr);
+          fflush(jpfp);
+        }
       }
     }
     jtr++;
+    /* Todos os ranks devel ler o traço para manter o ponteiro do arquivo
+     * sincronizado ou o rank 0 lê e faz o broadcast*/
   } while (fgettr(infp, &tr) && jtr < ntr);
+  double end_time = MPI_Wtime();
+
+  // if (rank == 0)
+  //   fprintf(stderr, "migration execution time: %f", end_time - start_time);
 
   fprintf(jpfp, " migrated %d traces in total\n", ktr);
 
-  memset((void*)&tro, 0, sizeof(segy));
-  tro.ns = nzo;
-  tro.d1 = dzo;
-  tro.dt = 1000 * (int)(1000 * dt + 0.5);
-  tro.delrt = 0.0;
-  tro.f1 = fzo;
-  tro.f2 = fxo;
-  tro.d2 = dxo;
-  tro.trid = 200;
-
-  scal = 4 / sqrt(PI) * dxm / v0;
-  for (ixo = 0; ixo < nxo; ixo++) {
-    for (io = 0; io < noff; io++) {
-      memcpy((void*)tro.data, (const void*)mig[io][ixo], nzo * sizeof(float));
-      tro.offset = off0 + io * doff;
-      tro.tracr = 1 + ixo;
-      tro.tracl = 1 + io + noff * ixo;
-      tro.cdp = fxo + ixo * dxo;
-      tro.cdpt = 1 + io;
-
-      for (izo = 0; izo < nzo; ++izo) tro.data[izo] *= scal;
-
-      /* write out */
-      fputtr(outfp, &tro);
-
-      if (npv) {
-        memcpy((void*)tro.data, (const void*)mig1[io][ixo],
-               nzo * sizeof(float));
-        for (izo = 0; izo < nzo; ++izo) tro.data[izo] *= scal;
-        /* write out */
-        fputtr(out1fp, &tro);
-      }
-    }
+  int total_num_elements = noff * nxo * nzo;
+  if (rank == 0) {
+    MPI_Reduce(MPI_IN_PLACE, &mig[0][0][0], total_num_elements, MPI_FLOAT,
+               MPI_SUM, 0, MPI_COMM_WORLD);
+  } else {
+    MPI_Reduce(&mig[0][0][0], NULL, total_num_elements, MPI_FLOAT, MPI_SUM, 0,
+               MPI_COMM_WORLD);
   }
 
-  fprintf(jpfp, " \n");
-  fprintf(jpfp, " output done\n");
+  if (rank == 0) {
+    memset((void*)&tro, 0, sizeof(segy));
+    tro.ns = nzo;
+    tro.d1 = dzo;
+    tro.dt = 1000 * (int)(1000 * dt + 0.5);
+    tro.delrt = 0.0;
+    tro.f1 = fzo;
+    tro.f2 = fxo;
+    tro.d2 = dxo;
+    tro.trid = 200;
+
+    scal = 4 / sqrt(PI) * dxm / v0;
+    for (ixo = 0; ixo < nxo; ixo++) {
+      for (io = 0; io < noff; io++) {
+        memcpy((void*)tro.data, (const void*)mig[io][ixo], nzo * sizeof(float));
+        tro.offset = off0 + io * doff;
+        tro.tracr = 1 + ixo;
+        tro.tracl = 1 + io + noff * ixo;
+        tro.cdp = fxo + ixo * dxo;
+        tro.cdpt = 1 + io;
+
+        for (izo = 0; izo < nzo; ++izo) tro.data[izo] *= scal;
+
+        /* write out */
+        fputtr(outfp, &tro);
+
+        if (npv) {
+          memcpy((void*)tro.data, (const void*)mig1[io][ixo],
+                 nzo * sizeof(float));
+          for (izo = 0; izo < nzo; ++izo) tro.data[izo] *= scal;
+          /* write out */
+          fputtr(out1fp, &tro);
+        }
+      }
+    }
+
+    fprintf(jpfp, " \n");
+    fprintf(jpfp, " output done\n");
+  }
   fflush(jpfp);
 
   efclose(jpfp);
@@ -526,6 +556,7 @@ int main(int argc, char** argv) {
     free2float(tvsum);
     free2float(cssum);
   }
+  MPI_Finalize();
   return (CWP_Exit());
 }
 
