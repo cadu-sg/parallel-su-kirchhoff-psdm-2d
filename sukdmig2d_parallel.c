@@ -4,6 +4,7 @@
 /* SUKDMIG2D: $Revision: 1.26 $ ; $Date: 2011/11/16 22:14:43 $	*/
 
 #include <mpi.h>
+#include <omp.h>
 #include <stdio.h>
 
 #include "su.h"
@@ -185,7 +186,8 @@ int main(int argc, char** argv) {
   MPI_Comm_size(MPI_COMM_WORLD, &world_size);
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  fprintf(stderr, "rank %d, processors %d\n", rank, world_size);
+  fprintf(stderr, "Number of processors: %d\n", world_size);
+  fprintf(stderr, "Number of threads: %d\n", omp_get_max_threads());
   int nt;   /* number of time samples in input data		*/
   int nzt;  /* number of z-values in traveltime table	*/
   int nxt;  /* number of x-values in traveltime table	*/
@@ -398,7 +400,6 @@ int main(int argc, char** argv) {
 
   fprintf(jpfp, " fs=%g es=%g offmax=%g\n", fs, es, offmax);
 
-  double start_time = MPI_Wtime();
   do {
     if ((jtr - 1) % world_size == rank) {
       // fprintf(stderr, "rank %d, migrate %d\n", rank, jtr);
@@ -481,7 +482,6 @@ int main(int argc, char** argv) {
     /* Todos os ranks devel ler o traço para manter o ponteiro do arquivo
      * sincronizado ou o rank 0 lê e faz o broadcast*/
   } while (fgettr(infp, &tr) && jtr < ntr);
-  double end_time = MPI_Wtime();
 
   // if (rank == 0)
   //   fprintf(stderr, "migration execution time: %f", end_time - start_time);
@@ -705,7 +705,12 @@ mig1		additional migrated section for velocity analysis if npv>0
   nxte = (xm + aperx - fxt) / dxt + 1;
   if (nxte >= nxt) nxte = nxt - 1;
 
-  /* compute amplitudes and filter length	*/
+/* compute amplitudes and filter length	*/
+/* Parallelize this loop with OpenMP */
+#pragma omp parallel for private(ix, x, dis, izt0, ar, jrs, srs, srs0, jrg, \
+                                     srg, srg0, sigp, iz, angs, angg, cs0s, \
+                                     cs0g, ampd, pd, temp)                  \
+    shared(ampt, ampti, tmt, zpt, ampt1)
   for (ix = nxtf; ix <= nxte; ++ix) {
     x = fxt + ix * dxt;
     dis = (xm >= x) ? xm - x : x - xm;
@@ -760,7 +765,12 @@ mig1		additional migrated section for velocity analysis if npv>0
   nxe = (xm + aperx - fx) / dx + 0.5;
   if (nxe >= nx) nxe = nx - 1;
 
-  /* interpolate amplitudes and filter length along lateral	*/
+/* interpolate amplitudes and filter length along lateral	*/
+/* Parallelize this loop with OpenMP */
+#pragma omp parallel for private(                                             \
+        ix, x, dis, izt0, iz0, ax, jx, ax0, ar, jrs, srs, srs0, jrg, srg,     \
+            srg0, iz, az, jz, sz, sz0, td, at, jt, ampd, mt, res, res0, temp, \
+            nzp) shared(mig, mig1, amp, ampi, tm, tzt, amp1)
   for (ix = nxf; ix <= nxe; ++ix) {
     x = fx + ix * dx;
     dis = (xm >= x) ? xm - x : x - xm;

@@ -10,7 +10,9 @@ B = .
 
 OPTC = -g
 
-LFLAGS= $(PRELFLAGS) -L$L -lsu -lpar -lcwp -lm $(POSTLFLAGS)
+OMPFLAGS = -fopenmp
+
+LFLAGS= $(PRELFLAGS) -L$L -lsu -lpar -lcwp -lm $(POSTLFLAGS) $(OMPFLAGS)
 
 
 PROGS =			\
@@ -24,7 +26,7 @@ INSTALL	:	$(PROGS)
 
 
 $(PROGS):	$(CTARGET) $D 
-	-$(MPICC) $(CFLAGS) $(@F).c $(LFLAGS) -o $@
+	-$(MPICC) $(CFLAGS) $(OMPFLAGS) $(@F).c $(LFLAGS) -o $@
 	@$(MCHMODLINE)
 	@echo $(@F) installed in $B
 
