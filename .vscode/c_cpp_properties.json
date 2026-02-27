@@ -7,7 +7,10 @@
                 "/opt/cwp/44R28/include/**",
                 "/usr/lib/x86_64-linux-gnu/openmpi/include"
             ],
-            "defines": [],
+            "defines": [
+                "_DEFAULT_SOURCE",
+                "_POSIX_SOURCE"
+            ],
             "compilerPath": "/usr/bin/gcc",
             "cStandard": "c17",
             "cppStandard": "gnu++17",
