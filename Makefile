@@ -17,6 +17,7 @@ LFLAGS= $(PRELFLAGS) -L$L -lsu -lpar -lcwp -lm $(POSTLFLAGS) $(OMPFLAGS)
 
 PROGS =			\
 	$B/sukdmig2d_parallel	\
+	$B/sukdmig2d_original	\
 	$B/sumigtopo2d_parallel
 
 
