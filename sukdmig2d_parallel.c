@@ -585,6 +585,7 @@ void sum2(int nx, int nz, float a1, float a2, float** t1, float** t2,
           float** t) {
   int ix, iz;
 
+#pragma omp parallel for private(iz) schedule(static)
   for (ix = 0; ix < nx; ++ix)
     for (iz = 0; iz < nz; ++iz) t[ix][iz] = a1 * t1[ix][iz] + a2 * t2[ix][iz];
 }
